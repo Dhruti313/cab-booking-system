@@ -1,0 +1,100 @@
+global:
+  environment: production
+
+postgresql:
+  enabled: true
+  auth:
+    username: cabapp
+    password: cabapp123
+    database: cabapp
+  primary:
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+
+redis:
+  enabled: true
+  auth:
+    password: redis123
+  master:
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+
+kafka:
+  enabled: true
+  replicaCount: 3
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "500m"
+
+services:
+  auth:
+    replicaCount: 2
+    image:
+      repository: dhruti313/cab-auth-service
+      tag: latest
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    
+  rider:
+    replicaCount: 2
+    image:
+      repository: dhruti313/cab-rider-service
+      tag: latest
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    
+  driver:
+    replicaCount: 2
+    image:
+      repository: dhruti313/cab-driver-service
+      tag: latest
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+    
+  trip:
+    replicaCount: 2
+    image:
+      repository: dhruti313/cab-trip-service
+      tag: latest
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+
+monitoring:
+  prometheus:
+    enabled: true
+  grafana:
+    enabled: true
