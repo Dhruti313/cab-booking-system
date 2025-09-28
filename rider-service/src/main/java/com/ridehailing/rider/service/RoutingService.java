@@ -3,9 +3,13 @@ package com.ridehailing.rider.service;
 import com.graphhopper.GHRequest;
 import com.graphhopper.GHResponse;
 import com.graphhopper.GraphHopper;
-import com.graphhopper.config.CHProfile;
+import com.graphhopper.GHRequest;
+import com.graphhopper.GHResponse;
+import com.graphhopper.GraphHopper;
 import com.graphhopper.config.Profile;
 import com.graphhopper.util.Parameters;
+import com.ridehailing.rider.dto.RouteResult;
+import com.ridehailing.rider.dto.RouteResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -25,19 +29,16 @@ public class RoutingService {
     @PostConstruct
     public void init() {
         graphHopper = new GraphHopper();
-        graphHopper.setOSMFile(osmFile);
+        
+        // Configure for car routing
         graphHopper.setGraphHopperLocation("graphhopper-cache");
+        graphHopper.setOSMFile(osmFile);
         
-        // Create profiles for different vehicle types
-        graphHopper.setProfiles(
-            new Profile("car").setVehicle("car").setWeighting("fastest").setTurnCosts(false),
-            new Profile("bike").setVehicle("bike").setWeighting("fastest").setTurnCosts(false)
-        );
+        // Set up the profile for car routing
+        Profile profile = new Profile("car").setVehicle("car").setWeighting("fastest");
+        graphHopper.setProfiles(profile);
         
-        // Enable speed mode
-        graphHopper.getCHPreparationHandler().setCHProfiles(new CHProfile("car"));
-        
-        // Load the graph
+        // Import and load the graph
         graphHopper.importOrLoad();
     }
 
@@ -46,8 +47,7 @@ public class RoutingService {
                 fromLat, fromLon,
                 toLat, toLon
         ).setProfile("car")
-         .setLocale(Locale.US)
-         .setAlgorithm(Parameters.Algorithms.ASTAR_BI);
+         .setLocale(Locale.US);
 
         GHResponse response = graphHopper.route(request);
 
