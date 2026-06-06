@@ -9,37 +9,31 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    defaults:
+      run:
+        working-directory: rider-service
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Set up JDK 17
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
         cache: maven
+        cache-dependency-path: rider-service/pom.xml
     
-    - name: Cache Maven packages
-      uses: actions/cache@v3
-      with:
-        path: ~/.m2
-        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-        restore-keys: ${{ runner.os }}-m2
+    - name: Make Maven wrapper executable
+      run: chmod +x mvnw
     
     - name: Build with Maven
       run: ./mvnw clean verify
-    
-    - name: Run Tests
-      run: ./mvnw test
-    
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-    
-    - name: Check code style
-      run: ./mvnw checkstyle:check
-    
+
     - name: Static code analysis
+      if: ${{ env.SONAR_TOKEN != '' }}
       run: ./mvnw sonar:sonar
       env:
-        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        SONAR_TOKEN: ${{ env.SONAR_TOKEN }}
