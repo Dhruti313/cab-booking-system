@@ -29,8 +29,17 @@ jobs:
     - name: Make Maven wrapper executable
       run: chmod +x mvnw
     
-    - name: Build with Maven
+    - name: Run tests and build
       run: ./mvnw clean verify
+
+    - name: Publish test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: rider-service-test-results
+        path: rider-service/target/surefire-reports/
+        if-no-files-found: warn
+        retention-days: 14
 
     - name: Static code analysis
       if: ${{ env.SONAR_TOKEN != '' }}
