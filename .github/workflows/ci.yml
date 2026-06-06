@@ -6,6 +6,10 @@ on:
   pull_request:
     branches: [ main, develop ]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -58,6 +62,90 @@ jobs:
             printf "| Branches | %d | %d | %.2f%% |\n", branches_covered, branches_missed, branch_rate;
           }
         ' target/site/jacoco/jacoco.csv >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Comment coverage on pull request
+      if: always() && github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const marker = '<!-- rider-service-coverage -->';
+          const reportPath = 'rider-service/target/site/jacoco/jacoco.csv';
+
+          let body;
+          if (!fs.existsSync(reportPath)) {
+            body = [
+              marker,
+              '### Rider service coverage',
+              '',
+              'Coverage report was not generated for this run. Check the CI logs for the Maven test/build step.'
+            ].join('\n');
+          } else {
+            const csv = fs.readFileSync(reportPath, 'utf8').trim().split('\n').slice(1);
+            const totals = csv.reduce((acc, line) => {
+              const cols = line.split(',');
+              acc.instructionMissed += Number(cols[3]);
+              acc.instructionCovered += Number(cols[4]);
+              acc.branchMissed += Number(cols[5]);
+              acc.branchCovered += Number(cols[6]);
+              acc.lineMissed += Number(cols[7]);
+              acc.lineCovered += Number(cols[8]);
+              return acc;
+            }, {
+              instructionMissed: 0,
+              instructionCovered: 0,
+              branchMissed: 0,
+              branchCovered: 0,
+              lineMissed: 0,
+              lineCovered: 0
+            });
+
+            const percent = (covered, missed) => {
+              const total = covered + missed;
+              return total === 0 ? '100.00%' : `${((covered * 100) / total).toFixed(2)}%`;
+            };
+
+            body = [
+              marker,
+              '### Rider service coverage',
+              '',
+              '| Metric | Covered | Missed | Coverage |',
+              '| --- | ---: | ---: | ---: |',
+              `| Lines | ${totals.lineCovered} | ${totals.lineMissed} | ${percent(totals.lineCovered, totals.lineMissed)} |`,
+              `| Branches | ${totals.branchCovered} | ${totals.branchMissed} | ${percent(totals.branchCovered, totals.branchMissed)} |`,
+              `| Instructions | ${totals.instructionCovered} | ${totals.instructionMissed} | ${percent(totals.instructionCovered, totals.instructionMissed)} |`,
+              '',
+              'Full HTML/XML/CSV report is available in the `rider-service-coverage-report` workflow artifact.'
+            ].join('\n');
+          }
+
+          const { owner, repo } = context.repo;
+          const issue_number = context.issue.number;
+          const comments = await github.paginate(github.rest.issues.listComments, {
+            owner,
+            repo,
+            issue_number,
+            per_page: 100
+          });
+          const existing = comments.find(comment =>
+            comment.user.type === 'Bot' && comment.body.includes(marker)
+          );
+
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner,
+              repo,
+              comment_id: existing.id,
+              body
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number,
+              body
+            });
+          }
 
     - name: Publish coverage report
       if: always()
