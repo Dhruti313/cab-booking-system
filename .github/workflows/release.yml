@@ -1,0 +1,127 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., 1.0.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  packages: write
+  pull-requests: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: maven
+      
+      - name: Determine version
+        id: version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            VERSION=${{ github.event.inputs.version }}
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Release version: $VERSION"
+      
+      - name: Update version in pom.xml files
+        run: |
+          find . -name "pom.xml" -type f ! -path "./target/*" ! -path "./.idea/*" -exec sed -i "s/<version>1.0-SNAPSHOT<\/version>/<version>${{ steps.version.outputs.version }}<\/version>/g" {} \;
+      
+      - name: Build all services
+        run: ./mvnw clean package -DskipTests
+        working-directory: rider-service
+      
+      - name: Run tests
+        run: ./mvnw verify
+        working-directory: rider-service
+      
+      - name: Create Docker images
+        run: |
+          docker build -t cab-booking/rider-service:${{ steps.version.outputs.version }} rider-service/
+          docker build -t cab-booking/driver-service:${{ steps.version.outputs.version }} driver-service/
+          docker build -t cab-booking/trip-service:${{ steps.version.outputs.version }} trip-service/
+          echo "Docker images built successfully"
+      
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          cat > release_notes.md << 'EOF'
+          # Cab Booking System Release ${{ steps.version.outputs.version }}
+          
+          ## Release Date
+          ${{ github.event.head_commit.timestamp }}
+          
+          ## What's Included
+          
+          This release includes:
+          - **Rider Service**: v${{ steps.version.outputs.version }}
+          - **Driver Service**: v${{ steps.version.outputs.version }}
+          - **Trip Service**: v${{ steps.version.outputs.version }}
+          
+          ## Docker Images
+          
+          ```bash
+          docker pull cab-booking/rider-service:${{ steps.version.outputs.version }}
+          docker pull cab-booking/driver-service:${{ steps.version.outputs.version }}
+          docker pull cab-booking/trip-service:${{ steps.version.outputs.version }}
+          ```
+          
+          ## Kubernetes Deployment
+          
+          ```bash
+          kubectl apply -f infrastructure/k8s/
+          ```
+          
+          See [CHANGELOG.md](CHANGELOG.md) for detailed changes.
+          EOF
+          
+          cat release_notes.md >> $GITHUB_STEP_SUMMARY
+      
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v1
+        with:
+          body_path: release_notes.md
+          tag_name: v${{ steps.version.outputs.version }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-artifacts
+          path: |
+            rider-service/target/*.jar
+            driver-service/target/*.jar
+            trip-service/target/*.jar
+          retention-days: 30
+      
+      - name: Commit version update
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add -A
+          git commit -m "chore: bump version to ${{ steps.version.outputs.version }}" || echo "No changes to commit"
+          git push || echo "Nothing to push"
