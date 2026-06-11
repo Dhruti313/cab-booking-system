@@ -3,12 +3,7 @@ package com.ridehailing.rider.service;
 import com.graphhopper.GHRequest;
 import com.graphhopper.GHResponse;
 import com.graphhopper.GraphHopper;
-import com.graphhopper.GHRequest;
-import com.graphhopper.GHResponse;
-import com.graphhopper.GraphHopper;
 import com.graphhopper.config.Profile;
-import com.graphhopper.util.Parameters;
-import com.ridehailing.rider.dto.RouteResult;
 import com.ridehailing.rider.dto.RouteResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,15 +24,15 @@ public class RoutingService {
     @PostConstruct
     public void init() {
         graphHopper = new GraphHopper();
-        
+
         // Configure for car routing
         graphHopper.setGraphHopperLocation("graphhopper-cache");
         graphHopper.setOSMFile(osmFile);
-        
+
         // Set up the profile for car routing
         Profile profile = new Profile("car").setVehicle("car").setWeighting("fastest");
         graphHopper.setProfiles(profile);
-        
+
         // Import and load the graph
         graphHopper.importOrLoad();
     }
@@ -45,9 +40,8 @@ public class RoutingService {
     public RouteResult calculateRoute(double fromLat, double fromLon, double toLat, double toLon) {
         GHRequest request = new GHRequest(
                 fromLat, fromLon,
-                toLat, toLon
-        ).setProfile("car")
-         .setLocale(Locale.US);
+                toLat, toLon).setProfile("car")
+                .setLocale(Locale.US);
 
         GHResponse response = graphHopper.route(request);
 

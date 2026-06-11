@@ -1,0 +1,74 @@
+version: '3.8'
+
+# Docker Compose override file for running released versions
+# Usage: docker-compose -f docker-compose.yml -f docker-compose.release.yml up -d
+#
+# This file shows how to use specific released images instead of building from source
+
+services:
+  rider-service:
+    image: cab-booking/rider-service:v1.0.0
+    container_name: rider-service
+    ports:
+      - "8001:8080"
+    environment:
+      - SPRING_APPLICATION_NAME=rider-service
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/ridehailing
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_REDIS_HOST=redis
+      - SPRING_REDIS_PORT=6379
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka:8761/eureka/
+      - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,metrics,prometheus
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    networks:
+      - cab-booking
+    restart: unless-stopped
+
+  driver-service:
+    image: cab-booking/driver-service:v1.0.0
+    container_name: driver-service
+    ports:
+      - "8002:8080"
+    environment:
+      - SPRING_APPLICATION_NAME=driver-service
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/ridehailing
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_REDIS_HOST=redis
+      - SPRING_REDIS_PORT=6379
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka:8761/eureka/
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    networks:
+      - cab-booking
+    restart: unless-stopped
+
+  trip-service:
+    image: cab-booking/trip-service:v1.0.0
+    container_name: trip-service
+    ports:
+      - "8003:8080"
+    environment:
+      - SPRING_APPLICATION_NAME=trip-service
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/ridehailing
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_REDIS_HOST=redis
+      - SPRING_REDIS_PORT=6379
+      - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka:8761/eureka/
+    depends_on:
+      - postgres
+      - redis
+      - kafka
+    networks:
+      - cab-booking
+    restart: unless-stopped
