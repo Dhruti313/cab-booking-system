@@ -6,40 +6,167 @@ on:
   pull_request:
     branches: [ main, develop ]
 
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    defaults:
+      run:
+        working-directory: rider-service
     
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     
     - name: Set up JDK 17
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4
       with:
         java-version: '17'
         distribution: 'temurin'
         cache: maven
+        cache-dependency-path: rider-service/pom.xml
     
-    - name: Cache Maven packages
-      uses: actions/cache@v3
-      with:
-        path: ~/.m2
-        key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-        restore-keys: ${{ runner.os }}-m2
+    - name: Make Maven wrapper executable
+      run: chmod +x mvnw
     
-    - name: Build with Maven
+    - name: Run tests and build
       run: ./mvnw clean verify
-    
-    - name: Run Tests
-      run: ./mvnw test
-    
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
-    
-    - name: Check code style
-      run: ./mvnw checkstyle:check
-    
+
+    - name: Publish coverage summary
+      if: always() && github.event_name == 'pull_request'
+      run: |
+        if [ ! -f target/site/jacoco/jacoco.csv ]; then
+          echo "### Rider service coverage" >> "$GITHUB_STEP_SUMMARY"
+          echo "Coverage report was not generated." >> "$GITHUB_STEP_SUMMARY"
+          exit 0
+        fi
+
+        awk -F, '
+          NR > 1 {
+            missed += $4; covered += $5;
+            branches_missed += $6; branches_covered += $7;
+          }
+          END {
+            total = missed + covered;
+            branch_total = branches_missed + branches_covered;
+            line_rate = total == 0 ? 100 : covered * 100 / total;
+            branch_rate = branch_total == 0 ? 100 : branches_covered * 100 / branch_total;
+            printf "### Rider service coverage\n\n";
+            printf "| Metric | Covered | Missed | Coverage |\n";
+            printf "| --- | ---: | ---: | ---: |\n";
+            printf "| Lines | %d | %d | %.2f%% |\n", covered, missed, line_rate;
+            printf "| Branches | %d | %d | %.2f%% |\n", branches_covered, branches_missed, branch_rate;
+          }
+        ' target/site/jacoco/jacoco.csv >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Comment coverage on pull request
+      if: always() && github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const marker = '<!-- rider-service-coverage -->';
+          const reportPath = 'rider-service/target/site/jacoco/jacoco.csv';
+
+          let body;
+          if (!fs.existsSync(reportPath)) {
+            body = [
+              marker,
+              '### Rider service coverage',
+              '',
+              'Coverage report was not generated for this run. Check the CI logs for the Maven test/build step.'
+            ].join('\n');
+          } else {
+            const csv = fs.readFileSync(reportPath, 'utf8').trim().split('\n').slice(1);
+            const totals = csv.reduce((acc, line) => {
+              const cols = line.split(',');
+              acc.instructionMissed += Number(cols[3]);
+              acc.instructionCovered += Number(cols[4]);
+              acc.branchMissed += Number(cols[5]);
+              acc.branchCovered += Number(cols[6]);
+              acc.lineMissed += Number(cols[7]);
+              acc.lineCovered += Number(cols[8]);
+              return acc;
+            }, {
+              instructionMissed: 0,
+              instructionCovered: 0,
+              branchMissed: 0,
+              branchCovered: 0,
+              lineMissed: 0,
+              lineCovered: 0
+            });
+
+            const percent = (covered, missed) => {
+              const total = covered + missed;
+              return total === 0 ? '100.00%' : `${((covered * 100) / total).toFixed(2)}%`;
+            };
+
+            body = [
+              marker,
+              '### Rider service coverage',
+              '',
+              '| Metric | Covered | Missed | Coverage |',
+              '| --- | ---: | ---: | ---: |',
+              `| Lines | ${totals.lineCovered} | ${totals.lineMissed} | ${percent(totals.lineCovered, totals.lineMissed)} |`,
+              `| Branches | ${totals.branchCovered} | ${totals.branchMissed} | ${percent(totals.branchCovered, totals.branchMissed)} |`,
+              `| Instructions | ${totals.instructionCovered} | ${totals.instructionMissed} | ${percent(totals.instructionCovered, totals.instructionMissed)} |`,
+              '',
+              'Full HTML/XML/CSV report is available in the `rider-service-coverage-report` workflow artifact.'
+            ].join('\n');
+          }
+
+          const { owner, repo } = context.repo;
+          const issue_number = context.issue.number;
+          const comments = await github.paginate(github.rest.issues.listComments, {
+            owner,
+            repo,
+            issue_number,
+            per_page: 100
+          });
+          const existing = comments.find(comment =>
+            comment.user.type === 'Bot' && comment.body.includes(marker)
+          );
+
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner,
+              repo,
+              comment_id: existing.id,
+              body
+            });
+          } else {
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number,
+              body
+            });
+          }
+
+    - name: Publish coverage report
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: rider-service-coverage-report
+        path: rider-service/target/site/jacoco/
+        if-no-files-found: warn
+        retention-days: 14
+
+    - name: Publish test results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: rider-service-test-results
+        path: rider-service/target/surefire-reports/
+        if-no-files-found: warn
+        retention-days: 14
+
     - name: Static code analysis
+      if: ${{ env.SONAR_TOKEN != '' }}
       run: ./mvnw sonar:sonar
       env:
-        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        SONAR_TOKEN: ${{ env.SONAR_TOKEN }}

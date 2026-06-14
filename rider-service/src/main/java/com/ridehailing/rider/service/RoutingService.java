@@ -3,18 +3,14 @@ package com.ridehailing.rider.service;
 import com.graphhopper.GHRequest;
 import com.graphhopper.GHResponse;
 import com.graphhopper.GraphHopper;
-import com.graphhopper.GHRequest;
-import com.graphhopper.GHResponse;
-import com.graphhopper.GraphHopper;
 import com.graphhopper.config.Profile;
-import com.graphhopper.util.Parameters;
-import com.ridehailing.rider.dto.RouteResult;
 import com.ridehailing.rider.dto.RouteResult;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
+import java.io.File;
 import java.util.Locale;
 
 @Service
@@ -22,32 +18,50 @@ import java.util.Locale;
 public class RoutingService {
 
     private GraphHopper graphHopper;
+    private boolean initialized = false;
 
     @Value("${graphhopper.osm.file:maps/your-region.osm.pbf}")
     private String osmFile;
 
     @PostConstruct
     public void init() {
-        graphHopper = new GraphHopper();
-        
-        // Configure for car routing
-        graphHopper.setGraphHopperLocation("graphhopper-cache");
-        graphHopper.setOSMFile(osmFile);
-        
-        // Set up the profile for car routing
-        Profile profile = new Profile("car").setVehicle("car").setWeighting("fastest");
-        graphHopper.setProfiles(profile);
-        
-        // Import and load the graph
-        graphHopper.importOrLoad();
+        // Check if OSM file exists before initializing
+        File osmFileCheck = new File(osmFile);
+        if (!osmFileCheck.exists()) {
+            log.warn("OSM file not found at: {}. Routing service will be disabled.", osmFile);
+            return;
+        }
+
+        try {
+            graphHopper = new GraphHopper();
+
+            // Configure for car routing
+            graphHopper.setGraphHopperLocation("graphhopper-cache");
+            graphHopper.setOSMFile(osmFile);
+
+            // Set up the profile for car routing
+            Profile profile = new Profile("car").setVehicle("car").setWeighting("fastest");
+            graphHopper.setProfiles(profile);
+
+            // Import and load the graph
+            graphHopper.importOrLoad();
+            initialized = true;
+            log.info("Routing service initialized successfully");
+        } catch (Exception e) {
+            log.error("Failed to initialize routing service", e);
+        }
     }
 
     public RouteResult calculateRoute(double fromLat, double fromLon, double toLat, double toLon) {
+        if (!initialized) {
+            log.warn("Routing service is not initialized. Returning null.");
+            return null;
+        }
+
         GHRequest request = new GHRequest(
                 fromLat, fromLon,
-                toLat, toLon
-        ).setProfile("car")
-         .setLocale(Locale.US);
+                toLat, toLon).setProfile("car")
+                .setLocale(Locale.US);
 
         GHResponse response = graphHopper.route(request);
 
