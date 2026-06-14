@@ -25,30 +25,40 @@ jobs:
         username: ${{ secrets.DOCKERHUB_USERNAME }}
         password: ${{ secrets.DOCKERHUB_TOKEN }}
     
+    - name: Build Java application
+      run: ./mvnw clean package -DskipTests
+      working-directory: rider-service
+
     - name: Build and push Docker images
       run: |
-        # Build all services
-        ./mvnw clean package -DskipTests
+        TAG_SHA="${{ github.sha }}"
+        NAMESPACE="${{ secrets.DOCKERHUB_USERNAME || 'dhruti313' }}"
         
-        # Build and push Docker images
-        docker build -t dhruti313/cab-auth-service:${{ github.sha }} ./auth-service
-        docker build -t dhruti313/cab-rider-service:${{ github.sha }} ./rider-service
-        docker build -t dhruti313/cab-driver-service:${{ github.sha }} ./driver-service
-        docker build -t dhruti313/cab-trip-service:${{ github.sha }} ./trip-service
-        
-        docker push dhruti313/cab-auth-service:${{ github.sha }}
-        docker push dhruti313/cab-rider-service:${{ github.sha }}
-        docker push dhruti313/cab-driver-service:${{ github.sha }}
-        docker push dhruti313/cab-trip-service:${{ github.sha }}
+        for service in auth-service rider-service driver-service trip-service; do
+          if [ -f "$service/Dockerfile" ]; then
+            echo "Building image for $service..."
+            IMAGE_NAME="$NAMESPACE/cab-$service"
+            
+            docker build -t $IMAGE_NAME:$TAG_SHA -t $IMAGE_NAME:latest $service/
+            
+            echo "Pushing image for $service..."
+            docker push $IMAGE_NAME:$TAG_SHA
+            docker push $IMAGE_NAME:latest
+          else
+            echo "Skipping $service (no Dockerfile found)"
+          fi
+        done
     
     - name: Deploy to Kubernetes
       if: startsWith(github.ref, 'refs/tags/')
       run: |
         echo "${{ secrets.KUBE_CONFIG }}" > kubeconfig.yaml
         export KUBECONFIG=kubeconfig.yaml
+        NAMESPACE="${{ secrets.DOCKERHUB_USERNAME || 'dhruti313' }}"
         
-        # Update Kubernetes deployments with new image tags
-        kubectl set image deployment/auth-service auth-service=dhruti313/cab-auth-service:${{ github.sha }}
-        kubectl set image deployment/rider-service rider-service=dhruti313/cab-rider-service:${{ github.sha }}
-        kubectl set image deployment/driver-service driver-service=dhruti313/cab-driver-service:${{ github.sha }}
-        kubectl set image deployment/trip-service trip-service=dhruti313/cab-trip-service:${{ github.sha }}
+        for service in auth-service rider-service driver-service trip-service; do
+          if [ -f "$service/Dockerfile" ]; then
+            echo "Updating deployment for $service..."
+            kubectl set image deployment/$service $service=$NAMESPACE/cab-$service:${{ github.sha }} || echo "Failed to set image for deployment/$service (deployment might not exist yet)"
+          fi
+        done
