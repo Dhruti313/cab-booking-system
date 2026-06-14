@@ -13,16 +13,16 @@ services:
       - "8001:8080"
     environment:
       - SPRING_APPLICATION_NAME=rider-service
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/ridehailing
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL}
+      - SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
+      - EUREKA_CLIENT_ENABLED=${EUREKA_CLIENT_ENABLED:-false}
       - SPRING_REDIS_HOST=redis
       - SPRING_REDIS_PORT=6379
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka:8761/eureka/
       - MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE=health,metrics,prometheus
     depends_on:
-      - postgres
       - redis
       - kafka
     networks:
@@ -36,15 +36,15 @@ services:
       - "8002:8080"
     environment:
       - SPRING_APPLICATION_NAME=driver-service
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/ridehailing
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL}
+      - SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
+      - EUREKA_CLIENT_ENABLED=${EUREKA_CLIENT_ENABLED:-false}
       - SPRING_REDIS_HOST=redis
       - SPRING_REDIS_PORT=6379
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka:8761/eureka/
     depends_on:
-      - postgres
       - redis
       - kafka
     networks:
@@ -58,15 +58,15 @@ services:
       - "8003:8080"
     environment:
       - SPRING_APPLICATION_NAME=trip-service
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/ridehailing
-      - SPRING_DATASOURCE_USERNAME=postgres
-      - SPRING_DATASOURCE_PASSWORD=password
+      - SPRING_DATASOURCE_URL=${SPRING_DATASOURCE_URL}
+      - SPRING_DATASOURCE_USERNAME=${SPRING_DATASOURCE_USERNAME}
+      - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
+      - EUREKA_CLIENT_ENABLED=${EUREKA_CLIENT_ENABLED:-false}
       - SPRING_REDIS_HOST=redis
       - SPRING_REDIS_PORT=6379
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - EUREKA_CLIENT_SERVICEURL_DEFAULTZONE=http://eureka:8761/eureka/
     depends_on:
-      - postgres
       - redis
       - kafka
     networks:

@@ -35,13 +35,16 @@ This microservice handles all rider-related operations in the cab booking system
 ## Setup
 
 1. Environment Variables
+
+Use the root `.env.example` as the template for local runtime configuration. Keep real credentials in environment variables or an ignored local `.env` file.
+
 ```properties
 SPRING_PROFILES_ACTIVE=dev
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=cabapp
-DB_USERNAME=cabapp
-DB_PASSWORD=cabapp123
+SPRING_DATASOURCE_URL=jdbc:postgresql://<your-neon-pooler-host>/<database>?sslmode=require
+SPRING_DATASOURCE_USERNAME=<your-neon-role>
+SPRING_DATASOURCE_PASSWORD=<your-neon-password>
+SPRING_JPA_HIBERNATE_DDL_AUTO=update
+SPRING_JPA_SHOW_SQL=false
 REDIS_HOST=localhost
 REDIS_PORT=6379
 KAFKA_BOOTSTRAP_SERVERS=localhost:9092
