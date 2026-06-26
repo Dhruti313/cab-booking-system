@@ -11,5 +11,6 @@ import org.springframework.cloud.openfeign.EnableFeignClients;
 public class RiderServiceApplication {
     public static void main(String[] args) {
         SpringApplication.run(RiderServiceApplication.class, args);
+        System.out.println("Hello");
     }
 }
